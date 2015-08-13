@@ -1,0 +1,9 @@
+---
+applications:
+- name: metastore-refresh-app
+  memory: 256M
+  command: python -m connector.app
+env:
+    IMPALA_HOST: "localhost"
+    IMPALA_PORT: "21050"
+
