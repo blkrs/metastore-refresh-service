@@ -5,5 +5,5 @@ applications:
   command: python -m connector.app
 env:
     IMPALA_HOST: "localhost"
-    IMPALA_PORT: "21050"
+    IMPALA_PORT: "31050"
 

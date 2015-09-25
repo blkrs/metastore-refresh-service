@@ -18,9 +18,11 @@ import os
 
 from collections import namedtuple
 
-from flask import Flask
+from flask import Flask, jsonify
+from flask_swagger import swagger
+from flask_cors import CORS
 from impala import dbapi
-
+from version import VERSION
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,9 +36,9 @@ DEFAULT_ROUTE_PARAMS = {
 
 Configuration = namedtuple("Configuration", "impala_host impala_port")
 
-
 app = Flask(__name__)
 
+CORS(app, resources={r"/*": {"origins":"*"}})
 
 def load_configuration():
     return Configuration(
@@ -44,11 +46,18 @@ def load_configuration():
         int(os.environ['IMPALA_PORT']),
     )
 
-
 @app.route("/", methods=["GET"])
 def check_health():
-    return 'Service running OK'
-
+    """
+    Service health check
+    ---
+    responses:
+        200:
+            description: Service is running OK
+    """
+    message = 'Service running OK'
+    logging.info(message)
+    return message
 
 def execute_impala_command(command, *args, **kwargs):
     with dbapi.connect(host=config.impala_host, port=config.impala_port) as conn:
@@ -61,7 +70,8 @@ def run_scoped_command(command, table, message):
     command += " " + table
     try:
         execute_impala_command(command)
-        return message % (table, )
+        logging.info(message)
+        return message % (table,)
     except Exception as ex:
         logging.exception("Failed executing: %s", command)
         return "Error processing command: %s: %s" % (command, str(ex))
@@ -70,14 +80,47 @@ def run_scoped_command(command, table, message):
 @app.route("/invalidate", methods=["POST"])
 @app.route("/invalidate/<table>", methods=["POST"])
 def invalidate_metadata(table=""):
+    """
+    Invalidate metastore
+    ---
+    parameters:
+        - in: path
+          name: table
+          required: false
+          type: string
+    responses:
+        200:
+            description: Metastore successfully invalidated
+    """
     return run_scoped_command(INVALIDATE_METADATA, table,
                               "Metastore invalidated %s successfully")
 
 
 @app.route("/refresh/<table>", methods=["POST"])
 def refresh_table(table):
+    """
+    Invalidate table in metastore
+    ---
+    parameters:
+        - in: path
+          name: table
+          required: false
+          type: string
+    responses:
+        200:
+            description: Table successfully invalidated
+    """
     return run_scoped_command(REFRESH, table,
                               "Refresh %s successful")
+
+
+@app.route("/api/spec", methods=["GET"])
+def spec():
+    swag = swagger(app)
+    swag['info']['version'] = VERSION
+    swag['info']['title'] = "Metastore refresh service api"
+    return jsonify(swag)
+
 
 
 if __name__ == "__main__":

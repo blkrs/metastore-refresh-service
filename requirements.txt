@@ -1,2 +1,4 @@
 Flask==0.10.1
 impyla==0.10.0
+flask_swagger==0.2.8
+flask_cors==2.1.0
